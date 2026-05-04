@@ -24,14 +24,27 @@
 .DS_Store
 *.pem
 
+# Google / service accounts (never commit)
+*credentials*.json
+**/service-account*.json
+**/client_secret*.json
+
 # debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# Secrets & local overrides — never commit real credentials
+.env
+.env.*
+!.env.example
+
+# local uploads + sqlite
+/uploads/
+!/uploads/.gitkeep
+/prisma/*.db
+/prisma/*.db-journal
 
 # vercel
 .vercel
