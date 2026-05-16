@@ -15,6 +15,7 @@
  */
 
 import { createWorker } from "tesseract.js";
+import "./polyfill";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import type { LayoutResult, Row } from "@/lib/extract/pdf-layout";
 import { extractLayout } from "@/lib/extract/pdf-layout";

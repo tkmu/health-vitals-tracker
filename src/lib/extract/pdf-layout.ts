@@ -14,6 +14,7 @@
  */
 
 // pdfjs-dist v4+ ships ESM by default; the legacy build works in Node without a worker.
+import "./polyfill";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 
 export type Word = {

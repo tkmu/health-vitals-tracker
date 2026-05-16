@@ -19,7 +19,7 @@ Health Vitals Tracker is a production-ready application for parsing, extracting,
 - **Backend/API:** Next.js Server Actions & API Routes, Node.js Runtime
 - **Database:** PostgreSQL (Google Cloud SQL), Prisma ORM
 - **File Storage:** Google Cloud Storage
-- **Parsing Engines:** `pdf-parse` (v2), `mammoth`, `csv-parse`, `xlsx`, `tesseract.js`
+- **Parsing Engines:** `pdfjs-dist` (Layout-aware), `mammoth`, `csv-parse`, `xlsx`, `tesseract.js`
 - **Deployment:** Docker, Google Cloud Run
 
 ## Architecture Overview
