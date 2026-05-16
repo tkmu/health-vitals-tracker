@@ -1,17 +1,18 @@
-import { extractFromPlainText, extractFromTableRows } from "@/lib/extract/text-pipeline";
+import { extractFromPlainText, extractFromTableRows, type ExtractedValue } from "@/lib/extract/text-pipeline";
+import { extractPdf } from "@/lib/extract/pdf-pipeline";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
 import { parse } from "csv-parse/sync";
-import { createRequire } from "node:module";
 import { createWorker } from "tesseract.js";
 
-const pdf = require("pdf-parse");
 export type IngestResult = {
-  readings: ReturnType<typeof extractFromPlainText>;
-  method: "pdf-text" | "xlsx" | "csv" | "docx" | "ocr" | "plain" | "unsupported";
+  readings: ExtractedValue[];
+  method: "pdf-text" | "pdf-ocr" | "xlsx" | "csv" | "docx" | "ocr" | "plain" | "unsupported";
   note?: string;
   extractedDate?: Date;
   fullText?: string;
+  /** Test-like rows that did NOT match the catalog. Useful for catalog-growth tooling. */
+  unmatchedCandidates?: Array<{ page: number; label: string; value: string; unit: string; range: string }>;
 };
 
 export async function ingestBuffer(buf: Buffer, fileName: string, mimeType: string): Promise<IngestResult> {
@@ -50,17 +51,33 @@ export async function ingestBuffer(buf: Buffer, fileName: string, mimeType: stri
 
   if (name.endsWith(".pdf") || mimeType === "application/pdf") {
     try {
-      const data = await pdf(buf);
-      const text = data.text || "";
-      const readings = extractFromPlainText(text);
-      if (readings.length === 0) {
-        return {
-          readings: [],
-          method: "pdf-text",
-          note: "No selectable text or no catalog matches. Scanned PDFs: export tables to CSV/XLSX, or use searchable PDF.",
-        };
-      }
-      return { readings, method: "pdf-text", fullText: text, extractedDate: extractDateFromText(text) };
+      const res = await extractPdf(buf);
+      // Translate Reading[] to the legacy ExtractedValue[] shape so callers
+      // (DB writer, UI) keep working without changes.
+      const readings: ExtractedValue[] = res.readings.map((r) => ({
+        parameterKey: r.parameterKey,
+        value: r.value,
+        unit: r.unit,
+        matchAlias: r.matchAlias,
+        sourceSnippet: r.sourceSnippet,
+      }));
+      const usedOcr = res.ocrPages.length > 0;
+      const note =
+        readings.length === 0
+          ? usedOcr
+            ? "PDF was rendered + OCR'd but no catalog matches were found."
+            : "PDF text was extracted but no catalog matches were found."
+          : res.failedPages.length > 0
+            ? `Pages ${res.failedPages.join(", ")} could not be read.`
+            : undefined;
+      return {
+        readings,
+        method: usedOcr ? "pdf-ocr" : "pdf-text",
+        note,
+        fullText: res.fullText,
+        extractedDate: extractDateFromText(res.fullText),
+        unmatchedCandidates: res.unmatched,
+      };
     } catch (e) {
       return {
         readings: [],

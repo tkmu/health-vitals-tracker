@@ -43,8 +43,8 @@ yarn-error.log*
 # local uploads + sqlite
 /uploads/
 !/uploads/.gitkeep
-/prisma/*.db
-/prisma/*.db-journal
+**/*.db
+**/*.db-journal
 
 # vercel
 .vercel
@@ -52,3 +52,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Tesseract language data downloaded at runtime by tesseract.js
+*.traineddata
