@@ -4,7 +4,11 @@ const nextConfig: NextConfig = {
   output: "standalone",
   serverExternalPackages: ["pdfjs-dist", "tesseract.js"],
   outputFileTracingIncludes: {
-    "/**/*": ["./node_modules/pdfjs-dist/legacy/build/**/*"],
+    "/api/**/*": [
+      "./node_modules/pdfjs-dist/legacy/build/**/*",
+      "./node_modules/tesseract.js/**/*",
+      "./node_modules/tesseract.js-core/**/*"
+    ],
   },
 };
 
