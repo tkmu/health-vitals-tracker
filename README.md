@@ -1,51 +1,58 @@
 # Health Vitals Tracker
 
-Health Vitals Tracker is a production-ready application for parsing, extracting, and securely tracking clinical lab measurements from your medical reports. It processes PDF, CSV, XLSX, DOCX, and image files to build a comprehensive history of your health metrics.
+Health Vitals Tracker is a production-ready web application for parsing, extracting, and securely tracking clinical lab measurements from your medical reports. It processes PDF, CSV, XLSX, DOCX, and image files to build a comprehensive, visual history of your health metrics over time.
 
 **Deployed URL:** [https://vitals-tracker-353564299092.us-central1.run.app](https://vitals-tracker-353564299092.us-central1.run.app)
 
-## Features
+## Features & Capabilities
 
 - **Multi-format Support:** Upload lab reports via PDF, CSV, Excel, Word, or plain text.
-- **OCR Integration:** Automatically reads text from image files (PNG, JPG, WebP) using Tesseract.js.
+- **Layout-Aware PDF Parsing:** Uses advanced coordinate-based extraction (`pdfjs-dist`) to reconstruct data rows and columns, preserving crucial tabular structures like "Name | Value | Unit | Reference Range" that traditional line-by-line parsers break.
+- **OCR Integration:** Automatically reads text from image-only PDFs and standard image files (PNG, JPG, WebP) using `tesseract.js` as a robust fallback mechanism.
+- **Intelligent Catalog Matching:** Matches extracted lab results against a predefined parameter catalog using aliases, acronym repair, and sanity-bound validation to ensure accurate data ingestion.
 - **Smart Date Extraction:** Intelligently extracts the test or sample collection date directly from your reports.
-- **Interactive UI:** Smooth Drag & Drop upload experience with an integrated side-by-side file viewer when manual date verification is needed.
-- **Secure Persistent Storage:** Backed by Google Cloud SQL (PostgreSQL) for relational data and Google Cloud Storage (GCS) for securely keeping uploaded files.
+- **Interactive Dashboard:** Visualizes your historical health data over time using dynamic Recharts graphs.
+- **Secure Persistent Storage:** Backed by Google Cloud SQL (PostgreSQL) for relational data and Google Cloud Storage (GCS) for secure file archiving.
 - **Authentication:** Integrated Google Sign-In with NextAuth (Auth.js) edge-compatible setup.
 
 ## Tech Stack
 
-- **Frontend:** Next.js 16 (App Router), React, Tailwind CSS, FontAwesome
-- **Backend/API:** Next.js Server Actions & API Routes, Node.js Runtime
+- **Frontend:** Next.js 16 (App Router), React, Tailwind CSS, Recharts
+- **Backend/API:** Next.js Server Actions & API Routes, Node.js
 - **Database:** PostgreSQL (Google Cloud SQL), Prisma ORM
 - **File Storage:** Google Cloud Storage
-- **Parsing Engines:** `pdfjs-dist` (Layout-aware), `mammoth`, `csv-parse`, `xlsx`, `tesseract.js`
+- **Parsing Engines:** `pdfjs-dist` (Layout-aware), `tesseract.js` (OCR), `mammoth`, `csv-parse`, `xlsx`
 - **Deployment:** Docker, Google Cloud Run
 
-## Architecture Overview
+## Agentic Workflow Diagram
 
 ```mermaid
 graph TD
-    User([User]) -->|Authenticates via Google| Auth[NextAuth.js edge middleware]
+    User([User]) -->|Authenticates via Google| Auth[NextAuth.js]
     User -->|Drags & Drops Report| UI[Upload UI - Next.js]
     
     UI -->|Sends Form Data| API[API Route: /api/reports/upload]
     
-    API -->|1. Parse Document| Parser[Ingest Engine]
-    Parser -->|Regex/Heuristics| DateExtractor[Extract Test Date]
-    Parser -.->|Uses| Tesseract(OCR for Images)
-    Parser -.->|Uses| PDFParse(PDF Extraction)
+    API -->|Route to correct pipeline| Ingest{File Type}
     
-    API -->|2. Check Date| DateCheck{Date Found?}
-    DateCheck -->|No| Prompt[Return requiresDate:true]
-    Prompt --> UI
+    Ingest -->|PDF/Image| PDFPipeline[pdf-pipeline.ts]
     
-    DateCheck -->|Yes| Storage[Save to GCS]
-    Storage --> DB[Save to Cloud SQL]
+    PDFPipeline -->|1. Layout-Aware Extraction| PDFDist[pdfjs-dist]
+    PDFDist -->|Text Missing?| OCR[tesseract.js OCR Fallback]
     
+    PDFPipeline -->|2. Row/Column Reconstruction| Layout[pdf-layout.ts]
+    Layout -->|3. Map to standard analytes| Catalog[catalog-matcher.ts]
+    
+    Ingest -->|Document/Spreadsheet| Other[mammoth/xlsx parsers]
+    
+    API -->|Check if date found| DateCheck{Date Extracted?}
+    DateCheck -->|No| Prompt[Return requiresDate:true to UI]
+    DateCheck -->|Yes| Storage[Archive file to GCS]
+    
+    Storage --> DB[Insert Readings to Cloud SQL]
     DB --> CloudSQL[(PostgreSQL Database)]
     Storage --> GCS[(Cloud Storage Bucket)]
+    
+    DB --> Dashboard[Dashboard API]
+    Dashboard -->|Visualize Data| Visuals[Recharts UI]
 ```
-
-## Setup & Deployment
-*This application is deployed on Google Cloud Run and is not intended for local self-hosting.*
