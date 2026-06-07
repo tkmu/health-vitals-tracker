@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/firestore";
 import { NextResponse } from "next/server";
+import { Timestamp } from "firebase-admin/firestore";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -22,19 +23,26 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Invalid date range" }, { status: 400 });
   }
 
-  const rows = await prisma.labMeasurement.findMany({
-    where: {
-      userId,
-      measuredAt: { gte: fromD, lte: toD },
-    },
-    orderBy: [{ measuredAt: "asc" }, { parameterKey: "asc" }],
-    select: {
-      parameterKey: true,
-      value: true,
-      unit: true,
-      measuredAt: true,
-      reportFileId: true,
-    },
+  const measurementsRef = db.collection("measurements");
+  const query = measurementsRef
+    .where("userId", "==", userId)
+    .where("measuredAt", ">=", Timestamp.fromDate(fromD))
+    .where("measuredAt", "<=", Timestamp.fromDate(toD))
+    .orderBy("measuredAt", "asc")
+    .orderBy("parameterKey", "asc");
+
+  const snapshot = await query.get();
+  const rows = snapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      parameterKey: data.parameterKey,
+      value: data.value,
+      unit: data.unit,
+      measuredAt: data.measuredAt && typeof data.measuredAt.toDate === "function" 
+        ? data.measuredAt.toDate().toISOString() 
+        : data.measuredAt,
+      reportFileId: data.reportFileId,
+    };
   });
 
   return NextResponse.json(rows);

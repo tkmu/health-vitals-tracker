@@ -1,10 +1,8 @@
 import { auth } from "@/auth";
 import { ingestBuffer } from "@/lib/extract/ingest-file";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/firestore";
 import { saveFile } from "@/lib/uploads";
 import crypto from "node:crypto";
-import fs from "node:fs/promises";
-import path from "node:path";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -45,7 +43,6 @@ export async function POST(req: Request) {
       readingsCount: ingest.readings.length,
       method: ingest.method,
     }, { status: 200 }); // Return 200 to avoid console noise, frontend handles requiresDate
-
   }
 
   const id = crypto.randomUUID();
@@ -53,37 +50,44 @@ export async function POST(req: Request) {
 
   const rawTextHash = crypto.createHash("sha256").update(buf.subarray(0, Math.min(buf.length, 500_000))).digest("hex");
 
-  const report = await prisma.reportFile.create({
-    data: {
-      id,
-      userId,
-      originalName: file.name,
-      storedPath,
-      mimeType: file.type || "application/octet-stream",
-      sizeBytes: buf.length,
-      reportDate,
-      parseNote: ingest.note?.replace(/\0/g, "") ?? null,
-      rawTextHash,
-    },
+  const reportDocRef = db.collection("reports").doc(id);
+  await reportDocRef.set({
+    userId,
+    originalName: file.name,
+    storedPath,
+    mimeType: file.type || "application/octet-stream",
+    sizeBytes: buf.length,
+    reportDate,
+    createdAt: new Date(),
+    parseNote: ingest.note?.replace(/\0/g, "") ?? null,
+    rawTextHash,
+    measurementsCount: ingest.readings.length,
   });
 
   if (ingest.readings.length > 0) {
-    await prisma.labMeasurement.createMany({
-      data: ingest.readings.map((r) => ({
-        userId,
-        reportFileId: report.id,
-        parameterKey: r.parameterKey,
-        value: r.value,
-        unit: r.unit,
-        measuredAt: reportDate,
-        matchAlias: r.matchAlias.replace(/\0/g, ""),
-        sourceSnippet: r.sourceSnippet.replace(/\0/g, ""),
-      })),
-    });
+    const chunkSize = 400;
+    for (let i = 0; i < ingest.readings.length; i += chunkSize) {
+      const chunk = ingest.readings.slice(i, i + chunkSize);
+      const mBatch = db.batch();
+      for (const r of chunk) {
+        const mDocRef = db.collection("measurements").doc();
+        mBatch.set(mDocRef, {
+          userId,
+          reportFileId: id,
+          parameterKey: r.parameterKey,
+          value: r.value,
+          unit: r.unit,
+          measuredAt: reportDate,
+          matchAlias: r.matchAlias.replace(/\0/g, ""),
+          sourceSnippet: r.sourceSnippet.replace(/\0/g, ""),
+        });
+      }
+      await mBatch.commit();
+    }
   }
 
   return NextResponse.json({
-    reportId: report.id,
+    reportId: id,
     readingsCount: ingest.readings.length,
     method: ingest.method,
     note: ingest.note,

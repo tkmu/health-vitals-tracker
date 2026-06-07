@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/firestore";
 import { removeStoredFile } from "@/lib/uploads";
 import { NextResponse } from "next/server";
 
@@ -13,15 +13,35 @@ export async function DELETE(_req: Request, ctx: Ctx) {
   }
 
   const { id } = await ctx.params;
-  const report = await prisma.reportFile.findFirst({
-    where: { id, userId },
-  });
-  if (!report) {
+  const reportDocRef = db.collection("reports").doc(id);
+  const reportDoc = await reportDocRef.get();
+
+  if (!reportDoc.exists) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  await removeStoredFile(report.storedPath);
-  await prisma.reportFile.delete({ where: { id: report.id } });
+  const reportData = reportDoc.data();
+  if (reportData?.userId !== userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (reportData.storedPath) {
+    await removeStoredFile(reportData.storedPath);
+  }
+
+  const batch = db.batch();
+  batch.delete(reportDocRef);
+
+  const measurementsSnapshot = await db
+    .collection("measurements")
+    .where("reportFileId", "==", id)
+    .get();
+
+  measurementsSnapshot.docs.forEach((doc) => {
+    batch.delete(doc.ref);
+  });
+
+  await batch.commit();
 
   return NextResponse.json({ ok: true });
 }

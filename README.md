@@ -12,14 +12,14 @@ Health Vitals Tracker is a production-ready web application for parsing, extract
 - **Intelligent Catalog Matching:** Matches extracted lab results against a predefined parameter catalog using aliases, acronym repair, and sanity-bound validation to ensure accurate data ingestion.
 - **Smart Date Extraction:** Intelligently extracts the test or sample collection date directly from your reports.
 - **Interactive Dashboard:** Visualizes your historical health data over time using dynamic Recharts graphs.
-- **Secure Persistent Storage:** Backed by Google Cloud SQL (PostgreSQL) for relational data and Google Cloud Storage (GCS) for secure file archiving.
+- **Secure Persistent Storage:** Backed by GCP Firestore (NoSQL) for serverless database storage and Google Cloud Storage (GCS) for secure file archiving.
 - **Authentication:** Integrated Google Sign-In with NextAuth (Auth.js) edge-compatible setup.
 
 ## Tech Stack
 
 - **Frontend:** Next.js 16 (App Router), React, Tailwind CSS, Recharts
 - **Backend/API:** Next.js Server Actions & API Routes, Node.js
-- **Database:** PostgreSQL (Google Cloud SQL), Prisma ORM
+- **Database:** GCP Firestore
 - **File Storage:** Google Cloud Storage
 - **Parsing Engines:** `pdfjs-dist` (Layout-aware), `tesseract.js` (OCR), `mammoth`, `csv-parse`, `xlsx`
 - **Deployment:** Docker, Google Cloud Run
@@ -49,8 +49,8 @@ graph TD
     DateCheck -->|No| Prompt[Return requiresDate:true to UI]
     DateCheck -->|Yes| Storage[Archive file to GCS]
     
-    Storage --> DB[Insert Readings to Cloud SQL]
-    DB --> CloudSQL[(PostgreSQL Database)]
+    Storage --> DB[Insert Readings to Firestore]
+    DB --> CloudSQL[(Firestore Database)]
     Storage --> GCS[(Cloud Storage Bucket)]
     
     DB --> Dashboard[Dashboard API]
